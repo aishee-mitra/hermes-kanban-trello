@@ -257,7 +257,12 @@
               "label",
               { className: "kt-field" },
               h("span", null, "Assignee"),
-              h("input", { className: "kt-input", value: assignee, placeholder: "(unassigned = you)", onChange: (e) => setAssignee(e.target.value) })
+              h(
+                "select",
+                { className: "kt-select", value: assignee, onChange: (e) => setAssignee(e.target.value) },
+                h("option", { value: "" }, "(unassigned = you)"),
+                props.knownAssignees.filter((a) => a).map((a) => h("option", { key: a, value: a }, a))
+              )
             )
           ),
           h(
@@ -411,6 +416,15 @@
         });
         return map;
       }, [tasks]);
+      const knownAssignees = useMemo(() => {
+        const s = /* @__PURE__ */ new Set();
+        tasks.forEach((t) => {
+          if (t.assignee) s.add(String(t.assignee));
+        });
+        if (assignLabel) s.add(assignLabel);
+        s.add("default");
+        return Array.from(s);
+      }, [tasks, assignLabel]);
       return h(
         "div",
         { className: "kt-root" },
@@ -462,6 +476,7 @@
         openTask ? h(TaskDrawer, {
           task: openTask,
           board,
+          knownAssignees,
           onClose: () => setOpenTask(null),
           onSaved: () => {
             setOpenTask(null);

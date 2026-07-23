@@ -215,6 +215,7 @@ import { reassignTask, getTask, updateTask } from "./api";
   function TaskDrawer(props: {
     task: any;
     board: string | null;
+    knownAssignees: string[];
     onClose: () => void;
     onSaved: () => void;
     onError: (msg: string) => void;
@@ -289,7 +290,14 @@ import { reassignTask, getTask, updateTask } from "./api";
             "label",
             { className: "kt-field" },
             h("span", null, "Assignee"),
-            h("input", { className: "kt-input", value: assignee, placeholder: "(unassigned = you)", onChange: (e: any) => setAssignee(e.target.value) })
+            h(
+            "select",
+            { className: "kt-select", value: assignee, onChange: (e: any) => setAssignee(e.target.value) },
+            h("option", { value: "" }, "(unassigned = you)"),
+            props.knownAssignees
+              .filter((a) => a)
+              .map((a) => h("option", { key: a, value: a }, a))
+          )
           )
         ),
         h(
@@ -477,6 +485,16 @@ import { reassignTask, getTask, updateTask } from "./api";
       return map;
     }, [tasks]);
 
+    const knownAssignees = useMemo(() => {
+      const s: Set<string> = new Set();
+      tasks.forEach((t: any) => {
+        if (t.assignee) s.add(String(t.assignee));
+      });
+      if (assignLabel) s.add(assignLabel);
+      s.add("default");
+      return Array.from(s);
+    }, [tasks, assignLabel]);
+
     return h(
       "div",
       { className: "kt-root" },
@@ -531,6 +549,7 @@ import { reassignTask, getTask, updateTask } from "./api";
         ? h(TaskDrawer, {
             task: openTask,
             board,
+            knownAssignees,
             onClose: () => setOpenTask(null),
             onSaved: () => {
               setOpenTask(null);
