@@ -1,6 +1,6 @@
 /// <reference path="./globals.d.ts" />
 import type React from "react";
-import { reassignTask } from "./api";
+import { reassignTask, getTask, updateTask } from "./api";
 (function () {
   "use strict";
 
@@ -68,10 +68,29 @@ import { reassignTask } from "./api";
     return l ? l.id : "backlog";
   }
 
+  const STATUS_OPTIONS = [
+    { value: "triage", label: "Backlog" },
+    { value: "todo", label: "ToDo (todo)" },
+    { value: "ready", label: "ToDo (ready)" },
+    { value: "running", label: "Doing" },
+    { value: "blocked", label: "Waiting (blocked)" },
+    { value: "review", label: "Waiting (review)" },
+    { value: "scheduled", label: "Waiting (scheduled)" },
+    { value: "done", label: "Done" },
+  ];
+
   // ---------------------------------------------------------------------------
   // Card
   // ---------------------------------------------------------------------------
-  function CardView(props: { task: any; onDragStart: (e: any) => void; onToggleNotify: (t: any) => void; notifyOn: boolean; onToggleAssign: (t: any) => void; assignLabel: string }) {
+  function CardView(props: {
+    task: any;
+    onDragStart: (e: any) => void;
+    onToggleNotify: (t: any) => void;
+    notifyOn: boolean;
+    onToggleAssign: (t: any) => void;
+    assignLabel: string;
+    onClick: (t: any) => void;
+  }) {
     const t = props.task;
     const prio = typeof t.priority === "number" ? t.priority : 0;
     const prioColor = prio > 0 ? "#ef4444" : prio < 0 ? "#64748b" : "#22c55e";
@@ -83,6 +102,10 @@ import { reassignTask } from "./api";
         draggable: true,
         onDragStart: (e: any) => props.onDragStart(e),
         "data-task-id": t.id,
+        onClick: (e: any) => {
+          e.stopPropagation();
+          props.onClick(t);
+        },
       },
       h(
         "div",
@@ -140,6 +163,7 @@ import { reassignTask } from "./api";
     assignLabel: string;
     dragOver: string | null;
     setDragOver: (id: string | null) => void;
+    onClickCard: (t: any) => void;
   }) {
     return h(
       "div",
@@ -177,9 +201,113 @@ import { reassignTask } from "./api";
             notifyOn: !!props.notifyMap[t.id],
             onToggleAssign: props.onToggleAssign,
             assignLabel: props.assignLabel,
+            onClick: props.onClickCard,
           })
         ),
         props.tasks.length === 0 ? h("div", { className: "kt-empty" }, "—") : null
+      )
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Task drawer (view + edit)
+  // ---------------------------------------------------------------------------
+  function TaskDrawer(props: {
+    task: any;
+    board: string | null;
+    onClose: () => void;
+    onSaved: () => void;
+    onError: (msg: string) => void;
+  }) {
+    const t = props.task || {};
+    const [title, setTitle] = useState(t.title || "");
+    const [body, setBody] = useState(t.body || "");
+    const [priority, setPriority] = useState(typeof t.priority === "number" ? t.priority : 0);
+    const [assignee, setAssignee] = useState(t.assignee || "");
+    const [status, setStatus] = useState(t.status || "triage");
+    const [saving, setSaving] = useState(false);
+
+    const save = () => {
+      setSaving(true);
+      const patch: Record<string, unknown> = {
+        title: title,
+        body: body,
+        priority: Number(priority) || 0,
+        assignee: assignee || null,
+        status: status,
+      };
+      updateTask(t.id, patch, props.board)
+        .then(() => {
+          setSaving(false);
+          props.onSaved();
+        })
+        .catch((e: any) => {
+          setSaving(false);
+          props.onError(String(e.message || e));
+        });
+    };
+
+    return h(
+      "div",
+      {
+        className: "kt-drawer-backdrop",
+        onClick: (e: any) => {
+          if (e.target === e.currentTarget) props.onClose();
+        },
+      },
+      h(
+        "div",
+        { className: "kt-drawer" },
+        h(
+          "div",
+          { className: "kt-drawer-head" },
+          h("span", { className: "kt-drawer-id" }, t.id || "new"),
+          h("button", { className: "kt-drawer-x", onClick: props.onClose }, "✕")
+        ),
+        h(
+          "label",
+          { className: "kt-field" },
+          h("span", null, "Title"),
+          h("input", { className: "kt-input", value: title, onChange: (e: any) => setTitle(e.target.value) })
+        ),
+        h(
+          "label",
+          { className: "kt-field" },
+          h("span", null, "Body / notes"),
+          h("textarea", { className: "kt-textarea", value: body, rows: 5, onChange: (e: any) => setBody(e.target.value) })
+        ),
+        h(
+          "div",
+          { className: "kt-row" },
+          h(
+            "label",
+            { className: "kt-field" },
+            h("span", null, "Priority"),
+            h("input", { className: "kt-input kt-num", type: "number", value: priority, onChange: (e: any) => setPriority(e.target.value) })
+          ),
+          h(
+            "label",
+            { className: "kt-field" },
+            h("span", null, "Assignee"),
+            h("input", { className: "kt-input", value: assignee, placeholder: "(unassigned = you)", onChange: (e: any) => setAssignee(e.target.value) })
+          )
+        ),
+        h(
+          "label",
+          { className: "kt-field" },
+          h("span", null, "Status"),
+          h(
+            "select",
+            { className: "kt-select", value: status, onChange: (e: any) => setStatus(e.target.value) },
+            STATUS_OPTIONS.map((o) => h("option", { key: o.value, value: o.value }, o.label))
+          )
+        ),
+        h(
+          "div",
+          { className: "kt-drawer-foot" },
+          h("button", { className: "kt-btn ghost", onClick: props.onClose }, "Cancel"),
+          h("button", { className: "kt-btn", onClick: save, disabled: saving }, saving ? "Saving…" : "Save")
+        )
       )
     );
   }
@@ -198,6 +326,7 @@ import { reassignTask } from "./api";
     const [newTitle, setNewTitle] = useState("");
     const [assignLabel, setAssignLabel] = useState("aishee");
     const dragTask = useRef(null);
+    const [openTask, setOpenTask] = useState(null); // task object for drawer
 
     // Resolve the "assign to" label from kanban.default_assignee (config).
     useEffect(() => {
@@ -229,14 +358,13 @@ import { reassignTask } from "./api";
                 .then((hc: any) => ({ id: t.id, tg: (hc.channels || []).some((c: any) => c.platform === "telegram" && c.subscribed) }))
                 .catch(() => ({ id: t.id, tg: false }))
             )
-          )
-          .then((res) => {
+          ).then((res: any) => {
             const m: Record<string, boolean> = {};
             res.forEach((r: any) => (m[r.id] = r.tg));
             setNotifyMap(m);
           });
         })
-        .catch((e) => {
+        .catch((e: any) => {
           setError(String(e.message || e));
           setLoading(false);
         });
@@ -285,11 +413,10 @@ import { reassignTask } from "./api";
           body: JSON.stringify({ status: target, block_reason: target === "blocked" ? "waiting" : undefined }),
         })
           .then(() => {
-            // nudge the dispatcher so ToDo/Doing drops get claimed promptly
             if (target === "ready") fetchJSON(withBoard(`${API}/dispatch?max=2`, board), { method: "POST" }).catch(() => {});
             load();
           })
-          .catch((e) => setError(String(e.message || e)));
+          .catch((e: any) => setError(String(e.message || e)));
       },
       [tasks, board, load]
     );
@@ -302,24 +429,31 @@ import { reassignTask } from "./api";
           .then(() => {
             setNotifyMap((m: any) => ({ ...m, [task.id]: !on }));
           })
-          .catch((e) => setError(String(e.message || e)));
+          .catch((e: any) => setError(String(e.message || e)));
       },
       [notifyMap, board]
     );
 
     const onToggleAssign = useCallback(
       (task: any) => {
-        // Toggle: if assigned to me already (or assigned at all), unassign;
-        // otherwise assign to the configured default assignee (you).
         const target = task.assignee ? "" : assignLabel;
         reassignTask(task.id, target, board)
           .then(() => load())
-          .catch((e) => setError(String(e.message || e)));
+          .catch((e: any) => setError(String(e.message || e)));
       },
       [assignLabel, board, load]
     );
 
-    const onCreate = useCallback(() => {
+    const onClickCard = useCallback(
+      (task: any) => {
+        getTask(task.id, board)
+          .then((d: any) => setOpenTask(d.task))
+          .catch((e: any) => setError(String(e.message || e)));
+      },
+      [board]
+    );
+
+    const onNewTask = useCallback(() => {
       const title = newTitle.trim();
       if (!title) return;
       fetchJSON(withBoard(`${API}/tasks`, board), {
@@ -330,7 +464,7 @@ import { reassignTask } from "./api";
           setNewTitle("");
           load();
         })
-        .catch((e) => setError(String(e.message || e)));
+        .catch((e: any) => setError(String(e.message || e)));
     }, [newTitle, board, load]);
 
     const byLane = useMemo(() => {
@@ -364,10 +498,10 @@ import { reassignTask } from "./api";
           value: newTitle,
           onChange: (e: any) => setNewTitle(e.target.value),
           onKeyDown: (e: any) => {
-            if (e.key === "Enter") onCreate();
+            if (e.key === "Enter") onNewTask();
           },
         }),
-        h("button", { className: "kt-btn", onClick: onCreate }, "+ Add"),
+        h("button", { className: "kt-btn", onClick: onNewTask }, "+ Add"),
         h("button", { className: "kt-btn ghost", onClick: load }, "↻ Refresh")
       ),
       error ? h("div", { className: "kt-error" }, error) : null,
@@ -388,10 +522,23 @@ import { reassignTask } from "./api";
             assignLabel,
             dragOver,
             setDragOver,
+            onClickCard,
           })
         )
       ),
-      h("div", { className: "kt-foot" }, "Trello skin over Hermes kanban · Backlog never auto-runs · drag to ToDo to start · ＋assign me / 🔔 Telegram")
+      h("div", { className: "kt-foot" }, "Trello skin over Hermes kanban · Backlog never auto-runs · drag to ToDo to start · ＋assign me / 🔔 Telegram · click a card to edit"),
+      openTask
+        ? h(TaskDrawer, {
+            task: openTask,
+            board,
+            onClose: () => setOpenTask(null),
+            onSaved: () => {
+              setOpenTask(null);
+              load();
+            },
+            onError: (msg: string) => setError(msg),
+          })
+        : null
     );
   }
 

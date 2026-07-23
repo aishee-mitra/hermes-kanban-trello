@@ -19,10 +19,19 @@
     const sep = url.includes("?") ? "&" : "?";
     return `${url}${sep}board=${encodeURIComponent(board)}`;
   }
+  function getTask(taskId, board) {
+    return fetchJSON(withBoard(`${BASE}/tasks/${encodeURIComponent(taskId)}`, board));
+  }
   function reassignTask(taskId, profile, board) {
     return fetchJSON(withBoard(`${BASE}/tasks/${encodeURIComponent(taskId)}/reassign`, board), {
       method: "POST",
       body: JSON.stringify({ profile, reclaim_first: false })
+    });
+  }
+  function updateTask(taskId, patch, board) {
+    return fetchJSON(withBoard(`${BASE}/tasks/${encodeURIComponent(taskId)}`, board), {
+      method: "PATCH",
+      body: JSON.stringify(patch)
     });
   }
 
@@ -71,6 +80,16 @@
       const l = LANES.find((x) => x.shows.includes(status));
       return l ? l.id : "backlog";
     }
+    const STATUS_OPTIONS = [
+      { value: "triage", label: "Backlog" },
+      { value: "todo", label: "ToDo (todo)" },
+      { value: "ready", label: "ToDo (ready)" },
+      { value: "running", label: "Doing" },
+      { value: "blocked", label: "Waiting (blocked)" },
+      { value: "review", label: "Waiting (review)" },
+      { value: "scheduled", label: "Waiting (scheduled)" },
+      { value: "done", label: "Done" }
+    ];
     function CardView(props) {
       const t = props.task;
       const prio = typeof t.priority === "number" ? t.priority : 0;
@@ -82,7 +101,11 @@
           className: "kt-card",
           draggable: true,
           onDragStart: (e) => props.onDragStart(e),
-          "data-task-id": t.id
+          "data-task-id": t.id,
+          onClick: (e) => {
+            e.stopPropagation();
+            props.onClick(t);
+          }
         },
         h(
           "div",
@@ -159,10 +182,100 @@
               onToggleNotify: props.onToggleNotify,
               notifyOn: !!props.notifyMap[t.id],
               onToggleAssign: props.onToggleAssign,
-              assignLabel: props.assignLabel
+              assignLabel: props.assignLabel,
+              onClick: props.onClickCard
             })
           ),
           props.tasks.length === 0 ? h("div", { className: "kt-empty" }, "\u2014") : null
+        )
+      );
+    }
+    function TaskDrawer(props) {
+      const t = props.task || {};
+      const [title, setTitle] = useState(t.title || "");
+      const [body, setBody] = useState(t.body || "");
+      const [priority, setPriority] = useState(typeof t.priority === "number" ? t.priority : 0);
+      const [assignee, setAssignee] = useState(t.assignee || "");
+      const [status, setStatus] = useState(t.status || "triage");
+      const [saving, setSaving] = useState(false);
+      const save = () => {
+        setSaving(true);
+        const patch = {
+          title,
+          body,
+          priority: Number(priority) || 0,
+          assignee: assignee || null,
+          status
+        };
+        updateTask(t.id, patch, props.board).then(() => {
+          setSaving(false);
+          props.onSaved();
+        }).catch((e) => {
+          setSaving(false);
+          props.onError(String(e.message || e));
+        });
+      };
+      return h(
+        "div",
+        {
+          className: "kt-drawer-backdrop",
+          onClick: (e) => {
+            if (e.target === e.currentTarget) props.onClose();
+          }
+        },
+        h(
+          "div",
+          { className: "kt-drawer" },
+          h(
+            "div",
+            { className: "kt-drawer-head" },
+            h("span", { className: "kt-drawer-id" }, t.id || "new"),
+            h("button", { className: "kt-drawer-x", onClick: props.onClose }, "\u2715")
+          ),
+          h(
+            "label",
+            { className: "kt-field" },
+            h("span", null, "Title"),
+            h("input", { className: "kt-input", value: title, onChange: (e) => setTitle(e.target.value) })
+          ),
+          h(
+            "label",
+            { className: "kt-field" },
+            h("span", null, "Body / notes"),
+            h("textarea", { className: "kt-textarea", value: body, rows: 5, onChange: (e) => setBody(e.target.value) })
+          ),
+          h(
+            "div",
+            { className: "kt-row" },
+            h(
+              "label",
+              { className: "kt-field" },
+              h("span", null, "Priority"),
+              h("input", { className: "kt-input kt-num", type: "number", value: priority, onChange: (e) => setPriority(e.target.value) })
+            ),
+            h(
+              "label",
+              { className: "kt-field" },
+              h("span", null, "Assignee"),
+              h("input", { className: "kt-input", value: assignee, placeholder: "(unassigned = you)", onChange: (e) => setAssignee(e.target.value) })
+            )
+          ),
+          h(
+            "label",
+            { className: "kt-field" },
+            h("span", null, "Status"),
+            h(
+              "select",
+              { className: "kt-select", value: status, onChange: (e) => setStatus(e.target.value) },
+              STATUS_OPTIONS.map((o) => h("option", { key: o.value, value: o.value }, o.label))
+            )
+          ),
+          h(
+            "div",
+            { className: "kt-drawer-foot" },
+            h("button", { className: "kt-btn ghost", onClick: props.onClose }, "Cancel"),
+            h("button", { className: "kt-btn", onClick: save, disabled: saving }, saving ? "Saving\u2026" : "Save")
+          )
         )
       );
     }
@@ -177,6 +290,7 @@
       const [newTitle, setNewTitle] = useState("");
       const [assignLabel, setAssignLabel] = useState("aishee");
       const dragTask = useRef(null);
+      const [openTask, setOpenTask] = useState(null);
       useEffect(() => {
         fetchJSON2(`${API}/config`).then((cfg) => {
           const da = cfg && (cfg.default_assignee || cfg.kanban && cfg.kanban.default_assignee) || "";
@@ -271,7 +385,13 @@
         },
         [assignLabel, board, load]
       );
-      const onCreate = useCallback(() => {
+      const onClickCard = useCallback(
+        (task) => {
+          getTask(task.id, board).then((d) => setOpenTask(d.task)).catch((e) => setError(String(e.message || e)));
+        },
+        [board]
+      );
+      const onNewTask = useCallback(() => {
         const title = newTitle.trim();
         if (!title) return;
         fetchJSON2(withBoard2(`${API}/tasks`, board), {
@@ -310,10 +430,10 @@
             value: newTitle,
             onChange: (e) => setNewTitle(e.target.value),
             onKeyDown: (e) => {
-              if (e.key === "Enter") onCreate();
+              if (e.key === "Enter") onNewTask();
             }
           }),
-          h("button", { className: "kt-btn", onClick: onCreate }, "+ Add"),
+          h("button", { className: "kt-btn", onClick: onNewTask }, "+ Add"),
           h("button", { className: "kt-btn ghost", onClick: load }, "\u21BB Refresh")
         ),
         error ? h("div", { className: "kt-error" }, error) : null,
@@ -333,11 +453,22 @@
               onToggleAssign,
               assignLabel,
               dragOver,
-              setDragOver
+              setDragOver,
+              onClickCard
             })
           )
         ),
-        h("div", { className: "kt-foot" }, "Trello skin over Hermes kanban \xB7 Backlog never auto-runs \xB7 drag to ToDo to start \xB7 \uFF0Bassign me / \u{1F514} Telegram")
+        h("div", { className: "kt-foot" }, "Trello skin over Hermes kanban \xB7 Backlog never auto-runs \xB7 drag to ToDo to start \xB7 \uFF0Bassign me / \u{1F514} Telegram \xB7 click a card to edit"),
+        openTask ? h(TaskDrawer, {
+          task: openTask,
+          board,
+          onClose: () => setOpenTask(null),
+          onSaved: () => {
+            setOpenTask(null);
+            load();
+          },
+          onError: (msg) => setError(msg)
+        }) : null
       );
     }
     if (window.__HERMES_PLUGINS__ && typeof window.__HERMES_PLUGINS__.register === "function") {

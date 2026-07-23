@@ -71,6 +71,10 @@ export function unsubscribeHome(taskId: string, platform: string, board?: string
   );
 }
 
+export function getTask(taskId: string, board?: string | null): Promise<{ task: any }> {
+  return fetchJSON(withBoard(`${BASE}/tasks/${encodeURIComponent(taskId)}`, board));
+}
+
 export function reassignTask(
   taskId: string,
   profile: string,
@@ -79,6 +83,17 @@ export function reassignTask(
   return fetchJSON(withBoard(`${BASE}/tasks/${encodeURIComponent(taskId)}/reassign`, board), {
     method: "POST",
     body: JSON.stringify({ profile, reclaim_first: false }),
+  });
+}
+
+export function updateTask(
+  taskId: string,
+  patch: Record<string, unknown>,
+  board?: string | null
+): Promise<{ task: KanbanTask }> {
+  return fetchJSON(withBoard(`${BASE}/tasks/${encodeURIComponent(taskId)}`, board), {
+    method: "PATCH",
+    body: JSON.stringify(patch),
   });
 }
 
