@@ -1,0 +1,19 @@
+name: kanban-trello
+version: 0.1.0
+description: >-
+  A Trello-style 5-column Kanban dashboard skin for Hermes Agent. Renders the
+  built-in kanban board as Backlog / ToDo / Doing / Waiting / Done, with
+  drag-and-drop and Telegram-by-default notifications. Frontend-only: it is a
+  thin presentation layer over the bundled kanban backend at
+  /api/plugins/kanban — it does NOT fork or replace any core code.
+author: Aishee Mitra
+kind: dashboard
+homepage: https://github.com/aishee-mitra/hermes-kanban-trello
+repository: https://github.com/aishee-mitra/hermes-kanban-trello
+license: MIT
+platforms:
+  - linux
+  - macos
+  - windows
+dashboard:
+  manifest: dashboard/manifest.json

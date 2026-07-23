@@ -1,0 +1,13 @@
+{
+  "name": "kanban-trello",
+  "label": "Kanban (Trello)",
+  "description": "Trello-style 5-column board — Backlog / ToDo / Doing / Waiting / Done — over the built-in kanban backend.",
+  "icon": "KanbanSquare",
+  "version": "0.1.0",
+  "tab": {
+    "path": "/kanban-trello",
+    "position": "after:kanban"
+  },
+  "entry": "dist/index.js",
+  "css": "style.css"
+}
