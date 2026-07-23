@@ -3,13 +3,13 @@
    doesn't expose the CSS variables. */
 
 .kt-root {
-  --kt-bg: var(--background-base, #0e1116);
-  --kt-panel: var(--card-bg, #161b22);
-  --kt-card: var(--kt-bg, #0e1116);
-  --kt-border: var(--border-subtle, #2a313c);
-  --kt-text: var(--text-base, #e6e9ef);
-  --kt-muted: var(--text-muted, #8b95a5);
-  --kt-accent: #3b82f6;
+  --kt-bg: var(--background-base, #0f141c);
+  --kt-panel: var(--card-bg, #18202c);
+  --kt-card: var(--kt-bg, #0f141c);
+  --kt-border: var(--border-subtle, #2c3744);
+  --kt-text: var(--text-base, #e7ecf3);
+  --kt-muted: var(--text-muted, #8b97a8);
+  --kt-accent: #4b8bff;
 
   color: var(--kt-text);
   font-family: var(--theme-font-sans, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
@@ -314,7 +314,7 @@
 .kt-field .kt-input,
 .kt-textarea,
 .kt-select {
-  background: var(--kt-bg, #0e1116);
+  background: var(--kt-panel, #161b22);
   color: var(--kt-text);
   border: 1px solid var(--kt-border, #2a313c);
   border-radius: 9px;
