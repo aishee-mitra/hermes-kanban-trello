@@ -1,11 +1,5 @@
 /// <reference path="./globals.d.ts" />
-// Hermes Kanban — Trello-style skin (frontend-only over /api/plugins/kanban).
-//
-// Renders the built-in kanban board as 5 lanes: Backlog / ToDo / Doing /
-// Waiting / Done. React and the Hermes plugin SDK are provided by the host
-// dashboard at runtime (window.__HERMES_PLUGIN_SDK__); we don't bundle them.
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import React from "react";
+import type React from "react";
 import { reassignTask } from "./api";
 (function () {
   "use strict";
@@ -13,13 +7,13 @@ import { reassignTask } from "./api";
   const SDK: any = window.__HERMES_PLUGIN_SDK__;
   if (!SDK) return;
 
-  const ReactRt = SDK.React;
-  // esbuild's jsxFactory is "h"; it must exist at runtime. Type it so that
-  // h<...>(...) generic calls type-check against React's createElement signature.
-  const h: typeof React.createElement = ReactRt.createElement;
-  // Use React's typed hook implementations (the host provides the same React
-  // instance via SDK.hooks; we alias for correct TypeScript signatures).
-  const { useState, useEffect, useCallback, useMemo, useRef } = SDK.hooks as typeof React;
+  // The host provides React via the plugin SDK — NOT as a global/injected
+  // module. Pull it straight off the SDK (this is what the bundled kanban
+  // plugin does). esbuild's jsxFactory "h" + jsxFragment "React.Fragment"
+  // resolve against this local `React` const at runtime.
+  const React = SDK.React;
+  const h: any = React.createElement;
+  const { useState, useEffect, useCallback, useMemo, useRef } = SDK.hooks;
   const { cn } = SDK.utils || {};
 
   // ---------------------------------------------------------------------------
@@ -194,16 +188,16 @@ import { reassignTask } from "./api";
   // Page
   // ---------------------------------------------------------------------------
   function KanbanTrelloPage() {
-    const [board, setBoard] = useState<string | null>(null);
-    const [boards, setBoards] = useState<{ slug: string; name?: string }[]>([]);
-    const [tasks, setTasks] = useState<any[]>([]);
-    const [notifyMap, setNotifyMap] = useState<Record<string, boolean>>({});
-    const [error, setError] = useState<string | null>(null);
+    const [board, setBoard] = useState(null);
+    const [boards, setBoards] = useState([]);
+    const [tasks, setTasks] = useState([]);
+    const [notifyMap, setNotifyMap] = useState({});
+    const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [dragOver, setDragOver] = useState<string | null>(null);
+    const [dragOver, setDragOver] = useState(null);
     const [newTitle, setNewTitle] = useState("");
-    const [assignLabel, setAssignLabel] = useState<string>("aishee");
-    const dragTask = useRef<string | null>(null);
+    const [assignLabel, setAssignLabel] = useState("aishee");
+    const dragTask = useRef(null);
 
     // Resolve the "assign to" label from kanban.default_assignee (config).
     useEffect(() => {
@@ -284,7 +278,7 @@ import { reassignTask } from "./api";
         const lane = LANES.find((l) => l.id === laneId);
         if (!lane) return;
         const target = lane.dropStatus;
-        const task = tasks.find((t) => t.id === taskId);
+        const task = tasks.find((t: any) => t.id === taskId);
         if (task && task.status === target) return;
         fetchJSON(withBoard(`${API}/tasks/${encodeURIComponent(taskId)}`, board), {
           method: "PATCH",
@@ -306,7 +300,7 @@ import { reassignTask } from "./api";
         const url = withBoard(`${API}/tasks/${encodeURIComponent(task.id)}/home-subscribe/telegram`, board);
         fetchJSON(url, { method: on ? "DELETE" : "POST" })
           .then(() => {
-            setNotifyMap((m) => ({ ...m, [task.id]: !on }));
+            setNotifyMap((m: any) => ({ ...m, [task.id]: !on }));
           })
           .catch((e) => setError(String(e.message || e)));
       },
@@ -342,7 +336,7 @@ import { reassignTask } from "./api";
     const byLane = useMemo(() => {
       const map: Record<string, any[]> = {};
       LANES.forEach((l) => (map[l.id] = []));
-      tasks.forEach((t) => {
+      tasks.forEach((t: any) => {
         const id = laneOf(t.status);
         (map[id] = map[id] || []).push(t);
       });

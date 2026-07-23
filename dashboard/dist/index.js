@@ -31,8 +31,8 @@
     "use strict";
     const SDK = window.__HERMES_PLUGIN_SDK__;
     if (!SDK) return;
-    const ReactRt = SDK.React;
-    const h = ReactRt.createElement;
+    const React = SDK.React;
+    const h = React.createElement;
     const { useState, useEffect, useCallback, useMemo, useRef } = SDK.hooks;
     const { cn } = SDK.utils || {};
     function fetchJSON2(url, init) {

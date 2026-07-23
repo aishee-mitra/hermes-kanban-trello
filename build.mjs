@@ -19,8 +19,8 @@ const opts = {
   jsx: "transform",
   jsxFactory: "h",
   jsxFragment: "React.Fragment",
-  // React comes from the host SDK at runtime; don't bundle it.
-  external: ["react", "react-dom"],
+  // React comes from the host SDK at runtime (SDK.React), pulled into a local
+  // `const React` inside the bundle — we do NOT import or externalize "react".
   loader: { ".tsx": "tsx", ".ts": "ts" },
 };
 
